@@ -1521,6 +1521,9 @@
 /* Define if you want to compile in DTrace support */
 #undef WITH_DTRACE
 
+/* Define if you want to compile in LTTng-UST support */
+#undef WITH_LTTNGUST
+
 /* Define if you want to use the new-style (Openstep, Rhapsody, MacOS) dynamic
    linker (dyld) instead of the old-style (NextStep) dynamic linker (rld).
    Dyld is necessary to support frameworks. */

@@ -53,7 +53,9 @@ LLVM_PROF_ERR=@LLVM_PROF_ERR@
 DTRACE=         @DTRACE@
 DFLAGS=         @DFLAGS@
 DTRACE_HEADERS= @DTRACE_HEADERS@
+LTTNGUST_HEADERS= @LTTNGUST_HEADERS@
 DTRACE_OBJS=    @DTRACE_OBJS@
+LTTNGUST_OBJS=    @LTTNGUST_OBJS@
 
 GNULD=		@GNULD@
 
@@ -369,7 +371,8 @@ PYTHON_OBJS=	\
 		Python/$(DYNLOADFILE) \
 		$(LIBOBJS) \
 		$(MACHDEP_OBJS) \
-		$(DTRACE_OBJS)
+		$(DTRACE_OBJS) \
+		$(LTTNGUST_OBJS)
 
 
 ##########################################################################
@@ -1015,7 +1018,7 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/pycapsule.h \
 		$(srcdir)/Include/pyctype.h \
 		$(srcdir)/Include/pydebug.h \
-		$(srcdir)/Include/pydtrace.h \
+		$(srcdir)/Include/cpython_inst.h \
 		$(srcdir)/Include/pyerrors.h \
 		$(srcdir)/Include/pyfpe.h \
 		$(srcdir)/Include/pyhash.h \
@@ -1088,7 +1091,8 @@ PYTHON_HEADERS= \
 		$(srcdir)/Include/internal/pycore_traceback.h \
 		$(srcdir)/Include/internal/pycore_tupleobject.h \
 		$(srcdir)/Include/internal/pycore_warnings.h \
-		$(DTRACE_HEADERS)
+		$(DTRACE_HEADERS) \
+		$(LTTNGUST_HEADERS)
 
 $(LIBRARY_OBJS) $(MODOBJS) Programs/python.o: $(PYTHON_HEADERS)
 

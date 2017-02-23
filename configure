@@ -649,6 +649,8 @@ DYNLOADFILE
 DLINCLDIR
 DTRACE_OBJS
 DTRACE_HEADERS
+LTTNGUST_OBJS
+LTTNGUST_HEADERS
 DFLAGS
 DTRACE
 TCLTK_LIBS
@@ -838,6 +840,7 @@ with_pymalloc
 with_c_locale_coercion
 with_valgrind
 with_dtrace
+with_lttngust
 with_libm
 with_libc
 enable_big_digits
@@ -1535,6 +1538,7 @@ Optional Packages:
                           locale
   --with-valgrind         Enable Valgrind support
   --with(out)-dtrace      disable/enable DTrace support
+  --with(out)-lttngust    disable/enable LTTng-UST support
   --with-libm=STRING      math library
   --with-libc=STRING      C library
   --with(out)-computed-gotos
@@ -11293,6 +11297,35 @@ fi
 
 
     OPT="-DDYNAMIC_ANNOTATIONS_ENABLED=1 $OPT"
+fi
+# Check for LTTng-UST support
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for --with-lttngust" >&5
+$as_echo_n "checking for --with-lttngust... " >&6; }
+
+# Check whether --with-dtrace was given.
+if test "${with_lttngust+set}" = set; then :
+  withval=$with_lttngust;
+else
+  with_lttngust=no
+fi
+
+LTTNGUST_HEADERS=
+LTTNGUST_OBJS=
+if test "$with_lttngust" = "yes"
+then
+  test_file=$(mktemp --suffix .c)
+  echo -e "#include <lttng/tracepoint.h>\n int main(void){return 0;}" > $test_file
+  if gcc -Werror -Wl,--no-as-needed -ldl $test_file 2> /dev/null
+  then
+    $as_echo "#define WITH_LTTNGUST 1" >>confdefs.h
+    LIBS="-ldl -llttng-ust  $LIBS"
+    LTTNGUST_HEADERS="Include/pylttngust_probes.h"
+    LTTNGUST_OBJS="Objects/pylttngust.o"
+  else
+    as_fn_error $? "Error while testing lttng/tracepoint header file." "$LINENO" 5
+    with_lttngust=no
+  fi
+  rm $test_file
 fi
 
 # Check for DTrace support

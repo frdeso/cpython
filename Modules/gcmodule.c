@@ -29,7 +29,7 @@
 #include "pycore_pymem.h"
 #include "pycore_pystate.h"
 #include "frameobject.h"        /* for PyFrame_ClearFreeList */
-#include "pydtrace.h"
+#include "cpython_inst.h"
 #include "pytime.h"             /* for _PyTime_GetMonotonicClock() */
 
 /*[clinic input]
@@ -992,8 +992,8 @@ collect(struct _gc_runtime_state *state, int generation,
         PySys_WriteStderr("\n");
     }
 
-    if (PyDTrace_GC_START_ENABLED())
-        PyDTrace_GC_START(generation);
+    if (PyTraceEnabled(gc__start))
+        PyTrace(gc__start, generation);
 
     /* update collection and allocation counters */
     if (generation+1 < NUM_GENERATIONS)
@@ -1153,8 +1153,8 @@ collect(struct _gc_runtime_state *state, int generation,
     stats->collected += m;
     stats->uncollectable += n;
 
-    if (PyDTrace_GC_DONE_ENABLED()) {
-        PyDTrace_GC_DONE(n+m);
+    if (PyTraceEnabled(gc__done)) {
+        PyTrace(gc__done, n+m);
     }
 
     assert(!PyErr_Occurred());

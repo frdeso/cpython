@@ -22,7 +22,7 @@
 #include "dictobject.h"
 #include "frameobject.h"
 #include "opcode.h"
-#include "pydtrace.h"
+#include "cpython_inst.h"
 #include "setobject.h"
 #include "structmember.h"
 
@@ -62,9 +62,9 @@ static void call_exc_trace(Py_tracefunc, PyObject *,
 static int maybe_call_line_trace(Py_tracefunc, PyObject *,
                                  PyThreadState *, PyFrameObject *,
                                  int *, int *, int *);
-static void maybe_dtrace_line(PyFrameObject *, int *, int *, int *);
-static void dtrace_function_entry(PyFrameObject *);
-static void dtrace_function_return(PyFrameObject *);
+static void maybe_pytrace_line(PyFrameObject *, int *, int *, int *);
+static void pytrace_function_entry(PyFrameObject *);
+static void pytrace_function_return(PyFrameObject *);
 
 static PyObject * cmp_outcome(PyThreadState *, int, PyObject *, PyObject *);
 static PyObject * import_name(PyThreadState *, PyFrameObject *,
@@ -840,7 +840,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 #ifdef LLTRACE
 #define FAST_DISPATCH() \
     { \
-        if (!lltrace && !_Py_TracingPossible(ceval) && !PyDTrace_LINE_ENABLED()) { \
+        if (!lltrace && !_Py_TracingPossible(ceval) && !PyTraceEnabled(line)) { \
             f->f_lasti = INSTR_OFFSET(); \
             NEXTOPARG(); \
             goto *opcode_targets[opcode]; \
@@ -850,7 +850,7 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
 #else
 #define FAST_DISPATCH() \
     { \
-        if (!_Py_TracingPossible(ceval) && !PyDTrace_LINE_ENABLED()) { \
+        if (!_Py_TracingPossible(ceval) && !PyTraceEnabled(line)) { \
             f->f_lasti = INSTR_OFFSET(); \
             NEXTOPARG(); \
             goto *opcode_targets[opcode]; \
@@ -1112,8 +1112,8 @@ _PyEval_EvalFrameDefault(PyFrameObject *f, int throwflag)
         }
     }
 
-    if (PyDTrace_FUNCTION_ENTRY_ENABLED())
-        dtrace_function_entry(f);
+    if (PyTraceEnabled(function__entry))
+        pytrace_function_entry(f);
 
     co = f->f_code;
     names = co->co_names;
@@ -1262,8 +1262,8 @@ main_loop:
     fast_next_opcode:
         f->f_lasti = INSTR_OFFSET();
 
-        if (PyDTrace_LINE_ENABLED())
-            maybe_dtrace_line(f, &instr_lb, &instr_ub, &instr_prev);
+        if (PyTraceEnabled(line))
+            maybe_pytrace_line(f, &instr_lb, &instr_ub, &instr_prev);
 
         /* line-by-line tracing support */
 
@@ -3804,8 +3804,9 @@ exit_yielding:
 
     /* pop frame */
 exit_eval_frame:
-    if (PyDTrace_FUNCTION_RETURN_ENABLED())
-        dtrace_function_return(f);
+    if (PyTraceEnabled(function__return))
+        pytrace_function_return(f);
+
     Py_LeaveRecursiveCall();
     f->f_executing = 0;
     tstate->frame = f->f_back;
@@ -5570,7 +5571,7 @@ _PyEval_RequestCodeExtraIndex(freefunc free)
 }
 
 static void
-dtrace_function_entry(PyFrameObject *f)
+pytrace_function_entry(PyFrameObject *f)
 {
     const char *filename;
     const char *funcname;
@@ -5580,11 +5581,11 @@ dtrace_function_entry(PyFrameObject *f)
     funcname = PyUnicode_AsUTF8(f->f_code->co_name);
     lineno = PyCode_Addr2Line(f->f_code, f->f_lasti);
 
-    PyDTrace_FUNCTION_ENTRY(filename, funcname, lineno);
+    PyTrace(function__entry, filename, funcname, lineno);
 }
 
 static void
-dtrace_function_return(PyFrameObject *f)
+pytrace_function_return(PyFrameObject *f)
 {
     const char *filename;
     const char *funcname;
@@ -5594,12 +5595,12 @@ dtrace_function_return(PyFrameObject *f)
     funcname = PyUnicode_AsUTF8(f->f_code->co_name);
     lineno = PyCode_Addr2Line(f->f_code, f->f_lasti);
 
-    PyDTrace_FUNCTION_RETURN(filename, funcname, lineno);
+    PyTrace(function__return, filename, funcname, lineno);
 }
 
-/* DTrace equivalent of maybe_call_line_trace. */
+/* PyTrace equivalent of maybe_call_line_trace. */
 static void
-maybe_dtrace_line(PyFrameObject *frame,
+maybe_pytrace_line(PyFrameObject *frame,
                   int *instr_lb, int *instr_ub, int *instr_prev)
 {
     int line = frame->f_lineno;
@@ -5626,7 +5627,7 @@ maybe_dtrace_line(PyFrameObject *frame,
         co_name = PyUnicode_AsUTF8(frame->f_code->co_name);
         if (!co_name)
             co_name = "?";
-        PyDTrace_LINE(co_filename, co_name, line);
+        PyTrace(line, co_filename, co_name, line);
     }
     *instr_prev = frame->f_lasti;
 }
