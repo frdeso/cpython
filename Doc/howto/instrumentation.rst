@@ -2,7 +2,18 @@
 
 .. _instrumentation:
 
-===============================================
+*********************
+Instrumenting CPython
+*********************
+CPython can be instrumented with a variety of different tracers. CPython can
+currently be used with three different tracers on different platforms.
+SystemTap and DTrace offer a versatile interface to agreggate statistics and
+timing data during the execution of the traced processes. SystemTap and DTrace
+are available on Linux and MacOS respectively. LTTng is a tracer aiming to
+limit the impact on the traced processes during the execution. The produced
+trace is formed of a list of events with precise timing information. LTTng is
+available on Linux.
+
 Instrumenting CPython with DTrace and SystemTap
 ===============================================
 
@@ -433,4 +444,145 @@ frames, each second, across the whole system:
         }
         delete fn_calls;
     }
+
+Instrumenting CPython with LTTng-UST
+====================================
+
+:author: Francis Deslauriers
+:author: Peter McCormick
+
+Overview of LTTng
+-----------------
+
+LTTng is a tracing suite that offers high performance tracing for both Linux
+Kernel space and User space. Instrumenting CPython allows tracing without root
+access on a machine using LTTng Userspace Tracing (LTTng-UST).
+
+Installing LTTng-UST
+--------------------
+
+Full installation instructions for LTTng are available at <https://lttng.org/download/>.
+On Debian-based machines, one can install the necessary packages with the
+following command::
+
+   $ apt-get install lttng-tools liblttng-ust-dev babeltrace
+
+On Fedora::
+
+   $ yum install lttng-tools
+   $ yum install lttng-ust
+
+N.B. To use the kernel tracer, you need to install the lttng-modules packages.
+
+Using LTTng
+-----------
+
+LTTng operates around the concept of tracing selected user space & kernel space
+events of interest within the context of a session. Here is how a tracing
+session is created, configured and started to trace the instrumented
+interpreter::
+
+  $ lttng create 'pysession'
+  $ lttng enable-event --userspace 'python:\*'
+  $ lttng start
+  $ ./python -m this
+  $ lttng stop
+
+The raw trace files will be written under
+
+``~/lttng-traces/pysession-$TIMESTAMP``.
+
+To print the trace on the screen you can you the view command::
+
+  $ lttng view
+
+To terminate the session, use the destroy command::
+
+  $ lttng destroy
+
+N.B. The destroy commands does not delete the trace files from the disk.
+
+Using LTTng-UST tracepoints in CPython
+--------------------------------------
+
+CPython must then be configured ``--with-lttngust``:
+
+.. code-block:: none
+
+   checking for --with-lttngust... yes
+
+To list the tracepoint available in CPython use the following command::
+
+  $ lttng-sessiond --daemonize
+  $ ./python -q &
+  $ lttng list --userspace --fields
+
+.. code-block:: none
+
+  UST events:
+  -------------
+
+  PID: 28192 - Name: ./python
+  [...]
+  lttng_ust_statedump:build_id (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: build_id (unknown)
+    field: baddr (integer)
+  lttng_ust_statedump:bin_info (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: has_debug_link (integer)
+    field: has_build_id (integer)
+    field: is_pic (integer)
+    field: path (string)
+    field: memsz (integer)
+    field: baddr (integer)
+  lttng_ust_statedump:start (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+  python:gc__done (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: collected (integer)
+  python:gc__start (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: generation (integer)
+  python:function__return (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: line_no (integer)
+    field: co_name (string)
+    field: co_filename (string)
+  python:function__entry (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: line_no (integer)
+    field: co_name (string)
+    field: co_filename (string)
+  python:line (loglevel: TRACE_DEBUG_LINE (13)) (type: tracepoint)
+    field: line_no (integer)
+    field: co_name (string)
+    field: co_filename (string)
+
+This output lists all the default events (some redacted out) as well as the
+ones supplied by the user prefixed by 'python:' in this case. For each event,
+we can see the payload of the tracepoint and the type and name of each of its
+fields.
+
+Any of these tracepoints can be enabled using the lttng enable-event command.
+For example, here is how you enable the python:gc__start event::
+
+  $ lttng enable-event --userspace python:gc__start
+
+Wildcard can be used to include all the Python interpreter tracepoints::
+
+  $ lttng enable-event --userspace python:*
+
+It is also possible to use filters to selectively trace events based on the
+value of one or many of its fields. For example, here we enable the function__entry
+event but only trace the event if the ``co_name`` fields is equal to ``foo``::
+
+  $ lttng enable-event --userspace python:function__entry --filter='co_name == "foo"'
+
+This reduces the tracing overhead by reducing the amount of data needing to be
+copied and reduce the overall size of the trace saved on disk.
+
+Other uses
+----------
+
+The LTTng-UST Python agent <http://lttng.org/docs/#doc-python-application>
+can be used to add tracepoint in Python code. The agent implements the standard
+``logging.Handler`` class. When used in combination with an instrumented
+CPython interpreter and the LTTng kernel tracer it is possible to aggregate all
+events of those different sources on a single trace which greatly simplifies
+investigations. The LTTng-ust Python agent is available on PyPI
+<https://pypi.python.org/pypi/lttngust/>
 
